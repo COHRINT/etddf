@@ -213,12 +213,12 @@ class DeltaTier:
             int -- explicit measurement count in this shared_buffer
         """
         # Fill in implicit measurements in the buffer and align the meas timestamps with our own
-        print("--- catching up ---")
+        # print("--- catching up ---")
         new_buffer_names = [x.meas_type for x in shared_buffer]
-        print(new_buffer_names)
+        # print(new_buffer_names)
         new_buffer = self._fillin_buffer(shared_buffer)
         new_buffer_names2 = [x.meas_type for x in new_buffer]
-        print(new_buffer_names2)
+        # print(new_buffer_names2)
 
         # Mark all measurement ledgers with triggers
         for i in range(len(new_buffer)):
@@ -236,10 +236,10 @@ class DeltaTier:
             meas_ledgers[mult] = self.delta_tiers[mult].ledger_meas + new_buffer
             meas_ledgers[mult].sort(key=sortfxn)
             new_buffer_names = [x.meas_type for x in self.delta_tiers[mult].ledger_meas]
-            print(new_buffer_names)
+            # print(new_buffer_names)
             new_buffer_names = [x.meas_type for x in meas_ledgers[mult]]
-            print(new_buffer_names)
-            print("---")
+            # print(new_buffer_names)
+            # print("---")
 
         main_ledger = self.main_filter.ledger_meas + new_buffer
         main_ledger.sort(key=sortfxn)
@@ -277,7 +277,7 @@ class DeltaTier:
                     delta_tiers[mult].predict(np.zeros((3,1)), Q)
                     delta_tiers[mult].correct()
                     update_ind += 1
-                    print("updating..")
+                    # print("updating..")
                 delta_tiers[mult].add_meas( ros2pythonMeas( meas ) )
             update_ind = 0
         for mult in self.delta_tiers: # Update once more
@@ -290,7 +290,7 @@ class DeltaTier:
                 main_filter.predict(np.zeros((3,1)), Q)
                 main_filter.correct()
                 update_ind += 1
-                print("updating..")
+                # print("updating..")
             main_filter.add_meas( ros2pythonMeas( meas ) )
         main_filter.predict(np.zeros((3,1)), Q) # Update once more
         main_filter.correct()

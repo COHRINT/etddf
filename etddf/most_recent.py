@@ -64,7 +64,7 @@ class MostRecent:
         self.buffer_capacity = buffer_capacity
         self.meas_space_table = meas_space_table
 
-    def add_meas(self, ros_meas, delta_multiplier=-1, force_fuse=True):
+    def add_meas(self, ros_meas):
         """Adds a measurement to filter
 
         Arguments:
@@ -180,7 +180,7 @@ class MostRecent:
         self.filter.P = posterior_cov
 
 
-    def catch_up(self, delta_multiplier, shared_buffer):
+    def catch_up(self, delta_multiplier, shared_buffer, Q):
         """Updates estimate based on buffer
 
         Arguments:
@@ -192,7 +192,6 @@ class MostRecent:
         """
         for meas in shared_buffer: # Fuse all of the measurements now
             self.add_meas(meas)
-        return 0, 0
 
     def pull_buffer(self):
         """Pulls all measurements that'll fit
