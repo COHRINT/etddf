@@ -544,6 +544,10 @@ class DeltaTier:
             print(str(dt_key) + " " + str(buffer))
 
 if __name__ == "__main__":
+
+    # TODO to run these tests, uncomment Measurement class in ledger_filter.py
+
+
     # Test plumbing
     import numpy as np
     import sys

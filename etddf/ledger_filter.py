@@ -17,18 +17,19 @@ from etddf.asset import Asset
 from etddf.ros2python import get_internal_meas_from_ros_meas
 import numpy as np
 from pdb import set_trace as st
-# from etddf.msg import Measurement
+from etddf.msg import Measurement
 
-class Measurement:
-    def __init__(self, meas_type, stamp, src_asset, measured_asset, data, variance, global_pose):
+# Just used for debugging
+# class Measurement:
+#     def __init__(self, meas_type, stamp, src_asset, measured_asset, data, variance, global_pose):
 
-        self.meas_type = meas_type
-        self.stamp = stamp
-        self.src_asset = src_asset
-        self.measured_asset = measured_asset
-        self.data = data
-        self.variance = variance
-        self.global_pose = global_pose
+#         self.meas_type = meas_type
+#         self.stamp = stamp
+#         self.src_asset = src_asset
+#         self.measured_asset = measured_asset
+#         self.data = data
+#         self.variance = variance
+#         self.global_pose = global_pose
 
 ## Lists all measurement substrings to not send implicitly
 MEASUREMENT_TYPES_NOT_SHARED =     ["modem", "depth"]

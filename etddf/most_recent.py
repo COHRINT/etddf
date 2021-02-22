@@ -13,23 +13,24 @@ __maintainer__ = "Luke Barbier"
 from copy import deepcopy
 from etddf.etfilter import ETFilter, ETFilter_Main
 from etddf.ros2python import get_internal_meas_from_ros_meas
-# from etddf_minau.msg import Measurement
+from etddf_minau.msg import Measurement
 import time
 from pdb import set_trace as st
 import numpy as np
 import scipy
 import scipy.optimize
 
-class Measurement:
-    def __init__(self, meas_type, stamp, src_asset, measured_asset, data, variance, global_pose):
+# Just used for debugging
+# class Measurement:
+#     def __init__(self, meas_type, stamp, src_asset, measured_asset, data, variance, global_pose):
 
-        self.meas_type = meas_type
-        self.stamp = stamp
-        self.src_asset = src_asset
-        self.measured_asset = measured_asset
-        self.data = data
-        self.variance = variance
-        self.global_pose = global_pose
+#         self.meas_type = meas_type
+#         self.stamp = stamp
+#         self.src_asset = src_asset
+#         self.measured_asset = measured_asset
+#         self.data = data
+#         self.variance = variance
+#         self.global_pose = global_pose
 
 class MostRecent:
     """Windowed Communication Event Triggered Communication
@@ -256,6 +257,9 @@ class MostRecent:
         return self.meas_ledger
 
 if __name__ == "__main__":
+
+    # TODO to run these tests, uncomment Measurement class above
+
     # Test plumbing
     test_buffer_pull = True
     test_catch_up = not test_buffer_pull
