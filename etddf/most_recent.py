@@ -194,7 +194,7 @@ class MostRecent:
         return 0, 0
 
     def pull_buffer(self):
-        """Pulls meas buffer
+        """Pulls all measurements that'll fit
 
         Returns:
             multiplier {float} -- the delta multiplier that was chosen
@@ -257,7 +257,7 @@ class MostRecent:
 
 if __name__ == "__main__":
     # Test plumbing
-    test_buffer_pull = False
+    test_buffer_pull = True
     test_catch_up = not test_buffer_pull
 
     import numpy as np
