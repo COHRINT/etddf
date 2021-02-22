@@ -208,9 +208,6 @@ class DeltaTier:
             delta_multiplier {float} -- multiplier to scale et_delta's with
             shared_buffer {list} -- buffer shared from another asset
             Q {np.ndarray} -- motion/process noise (nstates, nstates)
-        Returns:
-            int -- implicit measurement count in shared_buffer
-            int -- explicit measurement count in this shared_buffer
         """
         # Fill in implicit measurements in the buffer and align the meas timestamps with our own
         # print("--- catching up ---")
