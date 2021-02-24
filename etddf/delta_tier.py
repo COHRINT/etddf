@@ -13,9 +13,7 @@ __maintainer__ = "Luke Barbier"
 from copy import deepcopy
 from etddf.ledger_filter import LedgerFilter, MEASUREMENT_TYPES_NOT_SHARED, THIS_FILTERS_DELTA
 from etddf.etfilter import ETFilter, ETFilter_Main
-# from etddf.msg import Measurement
 from etddf.ros2python import get_internal_meas_from_ros_meas
-from etddf.ledger_filter import Measurement
 import time
 from pdb import set_trace as st
 import numpy as np
@@ -219,12 +217,12 @@ class DeltaTier:
 
         # Mark all measurement ledgers with triggers
         for i in range(len(new_buffer)):
-            new_buffer[i].et = delta_multiplier
+            new_buffer[i].et_delta = delta_multiplier
         for i in range(len(self.main_filter.ledger_meas)):
-            self.main_filter.ledger_meas[i].et = 1
+            self.main_filter.ledger_meas[i].et_delta = 1.0
         for mult in self.delta_tiers:
             for i in range(len(self.delta_tiers[mult].ledger_meas)):
-                self.delta_tiers[mult].ledger_meas[i].et = mult
+                self.delta_tiers[mult].ledger_meas[i].et_delta = mult
 
         meas_ledgers = {}
         # Merge new buffer with our measurements
@@ -264,7 +262,7 @@ class DeltaTier:
                 measured_id = self.asset2id[meas.measured_asset]
             else:
                 measured_id = -1
-            return get_internal_meas_from_ros_meas(meas, src_id, measured_id, delta * ros_meas.et)
+            return get_internal_meas_from_ros_meas(meas, src_id, measured_id, delta * ros_meas.et_delta)
 
         # Catch up common filters
         update_ind = 0
@@ -274,6 +272,9 @@ class DeltaTier:
                     delta_tiers[mult].predict(np.zeros((3,1)), Q)
                     delta_tiers[mult].correct()
                     update_ind += 1
+                    if update_ind >= len(update_times): # Ignore measurements in the future
+                        break
+
                     # print("updating..")
                 delta_tiers[mult].add_meas( ros2pythonMeas( meas ) )
             update_ind = 0
@@ -287,6 +288,8 @@ class DeltaTier:
                 main_filter.predict(np.zeros((3,1)), Q)
                 main_filter.correct()
                 update_ind += 1
+                if update_ind >= len(update_times): # Ignore measurements in the future
+                    break
                 # print("updating..")
             main_filter.add_meas( ros2pythonMeas( meas ) )
         main_filter.predict(np.zeros((3,1)), Q) # Update once more
@@ -459,13 +462,13 @@ class DeltaTier:
         for meas in shared_buffer:
             if meas.stamp > self.main_filter.ledger_update_times[update_ind]:
                 # print("updating index...")
-                update_ind += 1
-
+                
                 # Somehow we're future in time, shouldn't be possible...
                 if update_ind == len(self.main_filter.ledger_update_times): 
-                    update_ind -= 1 # Just stay in the final update
-                    break
+                    meas.stamp = self.main_filter.ledger_update_times[-1]
                 else:
+
+                    update_ind += 1
                     # Add implicit measurements
                     # print(list(expected_meas.keys()))
                     # print([x.meas_type for x in new_buffer])
@@ -548,6 +551,7 @@ if __name__ == "__main__":
     # Test plumbing
     import numpy as np
     import sys
+    from etddf.ledger_filter import Measurement
 
     x0 = np.zeros((6,1))
     P = np.eye(6); P[3:,3:] *= 0.1

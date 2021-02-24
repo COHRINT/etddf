@@ -130,7 +130,7 @@ class MostRecent:
         P_prior = self.filter.P[begin_ind:end_ind,begin_ind:end_ind]
         P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
         
-        c_bar, Pcc = DeltaTier.run_covariance_intersection(x, P, x_prior, P_prior)
+        c_bar, Pcc = MostRecent.run_covariance_intersection(x, P, x_prior, P_prior)
 
         # Update main filter states
         if Pcc.shape != self.filter.P.shape:
@@ -209,6 +209,8 @@ class MostRecent:
             if cost + space <= self.buffer_capacity:
                 buffer.append(new_meas)
                 cost += space
+            else:
+                break
             ind -= 1
         self.meas_ledger = []
         return 1, buffer

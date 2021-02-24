@@ -1,4 +1,5 @@
 from etddf.measurements import *
+import numpy as np
 
 def get_internal_meas_from_ros_meas(ros_meas, src_id, measured_id, et_delta):
     """Converts etddf/Measurement.msg (implicit or explicit) to a class in etddf/measurements.py

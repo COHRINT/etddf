@@ -17,7 +17,7 @@ from etddf.asset import Asset
 from etddf.ros2python import get_internal_meas_from_ros_meas
 import numpy as np
 from pdb import set_trace as st
-from etddf.msg import Measurement
+from etddf_minau.msg import Measurement
 
 # Just used for debugging
 # class Measurement:
@@ -302,7 +302,7 @@ class MeasurementBuffer:
             buffer {list} -- the flushed buffer
         """
         # Insert the "final_time" marker at the end of the buffer
-        final_time_marker = Measurement("final_time", final_time, "","",0.0,0.0,[])
+        final_time_marker = Measurement("final_time", final_time, "","",0.0,0.0,[], 0.0)
         self.buffer.append(final_time_marker)
 
         old_buffer = deepcopy(self.buffer)
