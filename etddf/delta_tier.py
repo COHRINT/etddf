@@ -302,6 +302,9 @@ class DeltaTier:
         c_bar, Pcc = DeltaTier.run_covariance_intersection(
             new_main_xhat, new_main_P,
             old_main_xhat, old_main_P)
+        # Update the main estimates
+        main_filter.x_hat = c_bar
+        main_filter.P = Pcc
         
         # Update the Filters
         for mult in self.delta_tiers:
