@@ -129,17 +129,21 @@ class DeltaTier:
         c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
         return c_bar.reshape(-1,1), Pcc
 
-    def intersect(self, x, P):
+    def intersect(self, x, P, update_time):
         """Runs covariance intersection with main filter's estimate
 
         Arguments:
             x {np.ndarray} -- other filter's mean
             P {np.ndarray} -- other filter's covariance
+            update_time {time} -- Update time to record on the ledger update times
 
         Returns:
             c_bar {np.ndarray} -- intersected estimate
             Pcc {np.ndarray} -- intersected covariance
         """
+
+        self.main_filter.nav_filter_est.append( [update_time, x, P])
+
         my_id = self.asset2id[self.my_name]
 
         # Slice out overlapping states in main filter
@@ -250,7 +254,7 @@ class DeltaTier:
         for mult in self.delta_tiers:
             delta_tiers[mult] = ETFilter(my_id, self.num_ownship_states, 3, comm_x0, comm_P0, True)
         main_filter = ETFilter(my_id, self.num_ownship_states, 3, main_x0, main_P0, True)
-
+        nav_filter_est = self.main_filter.nav_filter_est
 
         # Local function to simplify loops below
         def ros2pythonMeas(ros_meas):
@@ -283,6 +287,7 @@ class DeltaTier:
             delta_tiers[mult].correct()
         # Catch up main filter
         update_ind = 0
+        update_ind_nav = 0
         for meas in main_ledger:
             if meas.stamp > update_times[update_ind]:
                 main_filter.predict(np.zeros((3,1)), Q)
@@ -290,7 +295,17 @@ class DeltaTier:
                 update_ind += 1
                 if update_ind >= len(update_times): # Ignore measurements in the future
                     break
-                # print("updating..")
+            if meas.stamp >= nav_filter_est[update_ind_nav][0]:
+                
+                c_bar, Pcc = DeltaTier.run_covariance_intersection(
+                    main_filter.x_hat, main_filter.P,
+                    nav_filter_est[update_ind_nav][1], nav_filter_est[update_ind_nav][2])
+                
+                # Update the main estimates
+                main_filter.x_hat = c_bar
+                main_filter.P = Pcc
+                update_ind_nav += 1
+
             main_filter.add_meas( ros2pythonMeas( meas ) )
         main_filter.predict(np.zeros((3,1)), Q) # Update once more
         main_filter.correct()
@@ -322,13 +337,21 @@ class DeltaTier:
                     trim = i
             self.delta_tiers[mult].ledger_meas = deepcopy(ledger[trim:])
         ledger = main_ledger
-        trim = 0
+        trim, trim_nav = 0, 0
         for i in range(len(ledger)):
             if ledger[i].stamp < first_meas.stamp :
                 trim = i
+            else:
+                break
+        for i in range(len(nav_filter_est)):
+            if nav_filter_est[i][0] < first_meas.stamp:
+                trim_nav = i
+            else:
+                break
         # if trim != 0:
         #     print("Trimming Meas Ledger")
         self.main_filter.ledger_meas = deepcopy(ledger[trim:])
+        self.main_filter.nav_filter_est = deepcopy(nav_filter_est[trim_nav:])
 
         #### UPDATE TIMES ####
         update_times = self.main_filter.ledger_update_times

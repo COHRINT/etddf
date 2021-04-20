@@ -72,6 +72,7 @@ class LedgerFilter:
         # Initialize Ledgers
         self.ledger_meas = [] # In internal measurement form
         self.ledger_update_times = [] ## Update times of when correction step executed
+        self.nav_filter_est = []
         self.expected_measurements = {} # When we don't receive an expected measurement we need to insert a "bookend" into the measurement buffer
 
     def add_meas(self, ros_meas, src_id, measured_id):
