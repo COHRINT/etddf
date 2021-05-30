@@ -76,7 +76,7 @@ class ETFilter(object):
 
         C = get_measurement_jacobian(meas, self.x_hat, self.num_states, self.world_dim, self.num_ownship_states)
         innovation = self._get_innovation(meas, C)
-        return np.abs(innovation) <= meas.et_delta
+        return np.abs(innovation) <= meas.et_delta, innovation
 
     def add_meas(self, meas):
         """Adds a measurement to the filter
@@ -115,6 +115,10 @@ class ETFilter(object):
         """
         if u.shape[1] > u.shape[0]:
             raise ValueError("u must be column vector")
+        if Q is None:
+            raise ValueError("Q Must not be None")
+        if self.P is None:
+            raise ValueError("P is None")
         if Q.shape != self.P.shape:
             raise ValueError("Q must have (state x state) dimensions")
 
@@ -157,7 +161,15 @@ class ETFilter(object):
             else: # Implicit Update
                 C = get_measurement_jacobian(meas, self.x_hat, self.num_states, self.world_dim, self.num_ownship_states)
                 mu, Qe, alpha = self._get_implicit_predata(C, R, x_hat_start, P_start, meas)
+                if Qe < 0:
+                    print(C)
+                    print(P_start.dot(C.T))
+                    print(x_hat_start)
+                    raise Exception("Problematic Qe!")
                 z_bar, curly_theta = self._get_implicit_data(meas.et_delta, mu, Qe, alpha)
+                if meas.et_delta == 12:
+                    print("PROBLEMATIC MULTIPLIER")
+                    print(meas)
                 K = self._get_kalman_gain(C, R)
                 if meas.is_angle_meas:
                     z_bar = normalize_angle(z_bar)
@@ -170,7 +182,7 @@ class ETFilter(object):
     # If ETFilter_Main, method is overridden
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         mu = alpha = 0 # mu, alpha cancel out in the common information filter, not the case in main filter
-        Qe = np.abs( C.dot( P_start.dot( C.T )) + R )
+        Qe = C.dot( P_start.dot( C.T )) + R # LCB: remove absolute value here
         return mu, Qe, alpha
 
     def _get_innovation(self, meas, C):
@@ -190,6 +202,13 @@ class ETFilter(object):
     def _get_kalman_gain(self, C, R):
         tmp = np.dot( np.dot(C, self.P), C.T ) + R
         tmp_inv = np.linalg.inv( tmp ) if tmp.size > 1 else tmp**(-1) # Accomadate 1D and >1D filter
+        if np.abs(tmp[0,0]) < 0.001:
+            print(tmp)
+            print(tmp_inv)
+            print(C)
+            print(self.P)
+            print(R)
+            print("---")
         return self.P.dot(C.T.dot( tmp_inv ))
 
     def _get_implicit_data(self, delta, mu, Qe, alpha):
@@ -202,7 +221,22 @@ class ETFilter(object):
         z_bar = tmp.dot( np.sqrt( Qe ) )
 
         tmp2 = ( arg1.dot( normal.pdf( arg1)) - arg2.dot( normal.pdf( arg2 )) ) / ( Q_func(arg1) - Q_func(arg2))
-        curly_theta = np.linalg.matrix_power(tmp, 2) - tmp2
+        curly_theta = tmp**2 - tmp2
+
+        if abs(Q_func(arg1) - Q_func(arg2)) < 0.01:
+            print("@"*30)
+            print("Delta: {}".format(delta))
+            print("alpha: {}".format(alpha))
+            print("mu: {}".format(mu))
+            print("Qe: {}".format(Qe))
+            print("arg1: {}".format(arg1))
+            print("arg2: {}".format(arg2))
+            print("Q_func(arg1): {}".format(Q_func(arg1)))
+            print("Q_func(arg2): {}".format(Q_func(arg2)))
+            print("curly_theta: {}".format(curly_theta))
+            print("z_bar: {}".format(z_bar))
+            print("tmp: {}".format(tmp))
+            print("tmp2: {}".format(tmp2))
 
         return z_bar, curly_theta
 
@@ -225,9 +259,9 @@ class ETFilter_Main( ETFilter ):
     def _get_implicit_predata(self, C, R, x_hat_start, P_start, meas):
         x_ref = self._get_common_filter_states(meas.src_id).x_hat
         if meas.is_linear_meas:
-            mu = C.dot(self.x_hat) - C.dot(x_hat_start )
-            Qe = np.abs(C.dot( P_start.dot( C.T )) + R)
-            alpha = C.dot( x_ref) - C.dot(x_hat_start )
+            mu = C.dot(self.x_hat - x_hat_start )
+            Qe = C.dot( P_start.dot( C.T )) + R
+            alpha = C.dot( x_ref - x_hat_start)
         else: # Nonlinear Measurement
             mu0 = get_nonlinear_expected_meas(meas, self.x_hat, self.world_dim, self.num_ownship_states) 
             mu1 = get_nonlinear_expected_meas(meas, x_hat_start, self.world_dim, self.num_ownship_states)

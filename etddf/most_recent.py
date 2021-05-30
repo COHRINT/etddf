@@ -38,7 +38,7 @@ class MostRecent:
     Provides a buffer that can be pulled and received from another. Just shares the N most recent measurements of another agent
     """
 
-    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, missed_meas_tolerance_table, delta_codebook_table, delta_multipliers, asset2id, my_name):
+    def __init__(self, num_ownship_states, x0, P0, buffer_capacity, meas_space_table, delta_codebook_table, delta_multipliers, asset2id, my_name, default_meas_variance):
         """Constructor
 
         Arguments:
@@ -47,15 +47,16 @@ class MostRecent:
             P0 {np.ndarray} -- initial uncertainty
             buffer_capacity {int} -- capacity of measurement buffer
             meas_space_table {dict} -- Hash that stores how much buffer space a measurement takes up. Str (meas type) -> int (buffer space)
-            missed_meas_tolerance_table {dict} -- Hash that determines how many measurements of each type do we need to miss before indicating a bookend
             delta_codebook_table {dict} -- Hash that stores delta trigger for each measurement type. Str(meas type) -> float (delta trigger)
             delta_multipliers {list} -- List of delta trigger multipliers
             asset2id {dict} -- Hash to get the id number of an asset from the string name
             my_name {str} -- Name to loopkup in asset2id the current asset's ID#
+            default_meas_variance {dict} -- Hash to get measurement variance
         """
         self.meas_ledger = []
         self.asset2id = asset2id
         self.my_name = my_name
+        self.default_meas_variance = default_meas_variance
 
         self.filter = ETFilter(asset2id[my_name], num_ownship_states, 3, x0, P0, True)
 
@@ -63,6 +64,7 @@ class MostRecent:
         self.num_ownship_states = num_ownship_states
         self.buffer_capacity = buffer_capacity
         self.meas_space_table = meas_space_table
+        self.last_update_time = None
 
     def add_meas(self, ros_meas):
         """Adds a measurement to filter
@@ -106,42 +108,24 @@ class MostRecent:
         fxn = lambda omega: np.trace(np.linalg.inv(omega*Pa_inv + (1-omega)*Pb_inv))
         omega_optimal = scipy.optimize.minimize_scalar(fxn, bounds=(0,1), method="bounded").x
 
+        # print("Omega: {}".format(omega_optimal)) # We'd expect a value of 1
+
         Pcc = np.linalg.inv(omega_optimal*Pa_inv + (1-omega_optimal)*Pb_inv)
         c_bar = Pcc.dot( omega_optimal*Pa_inv.dot(xa) + (1-omega_optimal)*Pb_inv.dot(xb))
+
+        jump = max( [np.linalg.norm(c_bar - xa), np.linalg.norm(c_bar - xb)] )
+
+        if jump > 10: # Think this is due to a floating point error in the inversion
+            print("!!!!!!!!!!! BIG JUMP!!!!!!!")
+            print(xa)
+            print(xb)
+            print(c_bar)
+            print(omega_optimal)
+            print(Pa)
+            print(Pb)
+            print(Pcc)
+
         return c_bar.reshape(-1,1), Pcc
-
-    def intersect(self, x, P):
-        """Runs covariance intersection with filter's estimate
-
-        Arguments:
-            x {np.ndarray} -- other filter's mean
-            P {np.ndarray} -- other filter's covariance
-
-        Returns:
-            c_bar {np.ndarray} -- intersected estimate
-            Pcc {np.ndarray} -- intersected covariance
-        """
-        my_id = self.asset2id[self.my_name]
-
-        # Slice out overlapping states in main filter
-        begin_ind = my_id*self.num_ownship_states
-        end_ind = (my_id+1)*self.num_ownship_states
-        x_prior = self.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
-        P_prior = self.filter.P[begin_ind:end_ind,begin_ind:end_ind]
-        P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
-        
-        c_bar, Pcc = MostRecent.run_covariance_intersection(x, P, x_prior, P_prior)
-
-        # Update main filter states
-        if Pcc.shape != self.filter.P.shape:
-            # self.psci(x_prior, P_prior, c_bar, Pcc)
-            self.filter.x_hat[begin_ind:end_ind] = c_bar
-            self.filter.P[begin_ind:end_ind,begin_ind:end_ind] = P_prior
-        else:
-            self.filter.x_hat = c_bar
-            self.filter.P = Pcc
-
-        return c_bar, Pcc
 
     def psci(self, x_prior, P_prior, c_bar, Pcc):
         """ Partial State Update all other states of the filter using the result of CI
@@ -154,13 +138,14 @@ class MostRecent:
 
         Returns:
             None
-            Updates self.filter.x_hat and P, the delta tier's primary estimate
+            Updates self.main_filter.filter.x_hat and P, the delta tier's primary estimate
         """
+        # Full state estimates
         x = self.filter.x_hat
         P = self.filter.P
 
-        D_inv = np.linalg.inv(P_prior) - np.linalg.inv(Pcc)
-        D_inv_d = np.dot( np.linalg.inv(P_prior), x_prior) - np.dot( np.linalg.inv(Pcc), c_bar)
+        D_inv = np.linalg.inv(Pcc) - np.linalg.inv(P_prior)
+        D_inv_d = np.dot( np.linalg.inv(Pcc), c_bar) - np.dot( np.linalg.inv(P_prior), x_prior)
         
         my_id = self.asset2id[self.my_name]
         begin_ind = my_id*self.num_ownship_states
@@ -179,8 +164,54 @@ class MostRecent:
         self.filter.x_hat = posterior_state
         self.filter.P = posterior_cov
 
+    def intersect(self, x, P):
+        """Runs covariance intersection with main filter's estimate
 
-    def catch_up(self, delta_multiplier, shared_buffer, Q):
+        Arguments:
+            x {np.ndarray} -- other filter's mean
+            P {np.ndarray} -- other filter's covariance
+
+        Returns:
+            c_bar {np.ndarray} -- intersected estimate
+            Pcc {np.ndarray} -- intersected covariance
+        """
+
+        my_id = self.asset2id[self.my_name]
+
+        # Slice out overlapping states in main filter
+        begin_ind = my_id*self.num_ownship_states
+        end_ind = (my_id+1)*self.num_ownship_states
+        x_prior = self.filter.x_hat[begin_ind:end_ind].reshape(-1,1)
+        P_prior = self.filter.P[begin_ind:end_ind,begin_ind:end_ind]
+        P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
+        
+        c_bar, Pcc = MostRecent.run_covariance_intersection(x, P, x_prior, P_prior)
+
+        # Update main filter states
+        if Pcc.shape != self.filter.P.shape:
+            self.psci(x_prior, P_prior, c_bar, Pcc)
+            # self.filter.x_hat[begin_ind:end_ind] = c_bar
+            # self.filter.P[begin_ind:end_ind,begin_ind:end_ind] = Pcc
+        else:
+            self.filter.x_hat = c_bar
+            self.filter.P = Pcc
+
+        return c_bar, Pcc
+
+    def _add_variances(self, buffer):
+        for msg in buffer:
+            if "_burst" in msg.meas_type:
+                meas_type = msg.meas_type.split("_burst")[0]
+            else:
+                meas_type = msg.meas_type
+
+            msg.variance = self.default_meas_variance[meas_type] * 2.0
+        return buffer
+
+    def catch_up(self, index):
+        pass
+
+    def receive_buffer(self, buffer, mult, src_asset):
         """Updates estimate based on buffer
 
         Arguments:
@@ -190,8 +221,12 @@ class MostRecent:
             int -- implicit measurement count in shared_buffer
             int -- explicit measurement count in this shared_buffer
         """
-        for meas in shared_buffer: # Fuse all of the measurements now
+        buffer = self._add_variances(buffer)
+        # buffer = self._add_etdeltas(buffer, delta_multiplier)
+
+        for meas in buffer: # Fuse all of the measurements now
             self.add_meas(meas)
+        return 0, 0, len(buffer)
 
     def pull_buffer(self):
         """Pulls all measurements that'll fit
@@ -215,27 +250,30 @@ class MostRecent:
         self.meas_ledger = []
         return 1, buffer
 
-    def predict(self, u, Q, time_delta=1.0, use_control_input=False):
-        """Executes prediction step on all filters
+    def update(self, update_time, u, Q, nav_mean, nav_cov):
+        """Execute Prediction & Correction Step in filter
 
         Arguments:
-            u {np.ndarray} -- my asset's control input (num_ownship_states / 2, 1)
+            update_time {time} -- Update time to record on the ledger update times
+            u {np.ndarray} -- control input (num_ownship_states / 2, 1)
             Q {np.ndarray} -- motion/process noise (nstates, nstates)
-
-        Keyword Arguments:
-            time_delta {float} -- Amount of time to predict in future (default: {1.0})
-            use_control_input {bool} -- Use control input on filter
+            nav filter mean
+            nav filter covariance
         """
-        self.filter.predict(u, Q, time_delta, use_control_input=use_control_input)
+        if self.last_update_time is not None:
+            time_delta = (update_time - self.ledger[len(self.ledger) - 1]["time"]).to_sec()
+            self.filter.predict(u, Q, time_delta, use_control_input=False)
 
-    def correct(self, update_time):
-        """Executes correction step on all filters
-
-        Arguments:
-            update_time {time} -- not used (kept for interface)
-
-        """
+        # Run correction step on filter
         self.filter.correct()
+
+        # Intersect
+        c_bar, Pcc = None, None
+        if nav_mean is not None and nav_cov is not None:
+            # print("***************************8 Intersecting **********************************")
+            c_bar, Pcc = self.intersect(nav_mean, nav_cov)
+
+        return c_bar, Pcc
 
     def get_asset_estimate(self, asset_name):
         """Gets main filter's estimate of an asset
