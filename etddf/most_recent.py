@@ -66,7 +66,7 @@ class MostRecent:
         self.meas_space_table = meas_space_table
         self.last_update_time = None
 
-    def add_meas(self, ros_meas):
+    def add_meas(self, ros_meas, common=False):
         """Adds a measurement to filter
 
         Arguments:
@@ -84,7 +84,7 @@ class MostRecent:
         else:
             rospy.logerr("ETDDF doesn't recognize: " + ros_meas.measured_asset + " ... ignoring")
             return
-        meas = get_internal_meas_from_ros_meas(ros_meas, src_id, measured_id, 1)
+        meas = get_internal_meas_from_ros_meas(ros_meas, src_id, measured_id)
         self.filter.add_meas(meas)
         self.meas_ledger.append(ros_meas)
 
@@ -226,7 +226,7 @@ class MostRecent:
 
         for meas in buffer: # Fuse all of the measurements now
             self.add_meas(meas)
-        return 0, 0, len(buffer)
+        return 0, len(buffer)
 
     def pull_buffer(self):
         """Pulls all measurements that'll fit

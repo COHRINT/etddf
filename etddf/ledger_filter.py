@@ -475,10 +475,10 @@ class LedgerFilter:
         buffer = []
         explicit_buffer = []
 
-        report_implicit_count = 0
-        report_last_shared_time = self.ledger[last_shared_index]["time"]
-        report_now_last_shared_time = rospy.get_rostime()
-        report_duration = report_now_last_shared_time - report_last_shared_time
+        # report_implicit_count = 0
+        # report_last_shared_time = self.ledger[last_shared_index]["time"]
+        # report_now_last_shared_time = rospy.get_rostime()
+        # report_duration = report_now_last_shared_time - report_last_shared_time
 
         meas_dict = self._get_shareable_meas_dict(last_shared_index)
         print("PULLING BUFFER: current index {}".format(len(self.ledger)))
@@ -510,7 +510,7 @@ class LedgerFilter:
             burst_msg = self._make_burst_msg(msg_id, len(b), start_time, mean_lat)
             buffer.append( burst_msg )
             explicit_buffer.extend( explicit )
-            report_implicit_count += (len(b) - len(explicit))
+            # report_implicit_count += (len(b) - len(explicit))
         
         meas_sort = lambda x : x.stamp
         explicit_buffer.sort(key=meas_sort, reverse=True)

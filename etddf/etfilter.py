@@ -217,13 +217,7 @@ class ETFilter(object):
         arg1 = ( -delta + alpha - mu ) / np.sqrt( Qe )
         arg2 = ( delta + alpha - mu ) / np.sqrt( Qe )
 
-        tmp = ( normal.pdf( arg1 ) - normal.pdf( arg2 ) ) / ( Q_func(arg1) - Q_func(arg2 ) )
-        z_bar = tmp.dot( np.sqrt( Qe ) )
-
-        tmp2 = ( arg1.dot( normal.pdf( arg1)) - arg2.dot( normal.pdf( arg2 )) ) / ( Q_func(arg1) - Q_func(arg2))
-        curly_theta = tmp**2 - tmp2
-
-        if abs(Q_func(arg1) - Q_func(arg2)) < 0.01:
+        if abs(Q_func(arg1) - Q_func(arg2)) < 0.001:
             print("@"*30)
             print("Delta: {}".format(delta))
             print("alpha: {}".format(alpha))
@@ -233,10 +227,15 @@ class ETFilter(object):
             print("arg2: {}".format(arg2))
             print("Q_func(arg1): {}".format(Q_func(arg1)))
             print("Q_func(arg2): {}".format(Q_func(arg2)))
-            print("curly_theta: {}".format(curly_theta))
-            print("z_bar: {}".format(z_bar))
-            print("tmp: {}".format(tmp))
-            print("tmp2: {}".format(tmp2))
+            return 0.0, 0.0
+        else:
+
+            tmp = ( normal.pdf( arg1 ) - normal.pdf( arg2 ) ) / ( Q_func(arg1) - Q_func(arg2 ) )
+            tmp2 = ( arg1.dot( normal.pdf( arg1)) - arg2.dot( normal.pdf( arg2 )) ) / ( Q_func(arg1) - Q_func(arg2))
+
+        z_bar = tmp.dot( np.sqrt( Qe ) )
+        
+        curly_theta = tmp**2 - tmp2
 
         return z_bar, curly_theta
 

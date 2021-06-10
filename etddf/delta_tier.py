@@ -82,7 +82,7 @@ class DeltaTier:
         ledger_ind = self.main_filter.add_meas(deepcopy(ros_meas))
         if common:
             ledger_ind2 = self.common_filter.add_meas(deepcopy(ros_meas))
-            self.last_shared_index = max([self.last_shared_index, ledger_ind2])
+            # self.last_shared_index = max([self.last_shared_index, ledger_ind2])
         return ledger_ind
 
     def receive_buffer(self, shared_buffer, delta_multiplier, src_asset):
@@ -156,13 +156,23 @@ class DeltaTier:
         # print("Implicit cnt: {}".format(implicit_cnt))
         # print("Explicit cnt: {}".format(explicit_cnt))
         
-        self.last_shared_index = max(shared_indices)
+        if shared_indices: # sometimes no measurements shared
+            self.last_shared_index = max(shared_indices)
 
         return implicit_cnt, explicit_cnt
 
     def catch_up(self, start_ind): # Just used with modem meas
         self.main_filter.catch_up(start_ind)
         self.common_filter.catch_up(start_ind)
+
+    def debug_ledger(self, ledger):
+        for i in range(1, len(ledger)):
+            print("## {} ##".format(i))
+            block = ledger[i]
+            for j in range(len(block["meas"])):
+                m = block["meas"][j]
+                msg_id = self.main_filter._get_meas_identifier(m)
+                print("\t#{} {} {} {}".format(j, msg_id, m.data, m.stamp.to_sec()))
 
     def pull_buffer(self):
         """Pulls lowest delta multiplier's buffer that hasn't overflown
@@ -178,6 +188,9 @@ class DeltaTier:
         common_ledger = self.common_filter.ledger
 
         self.last_shared_index = len(main_ledger)
+
+        # print("Main Ledger")
+        # self.debug_ledger(main_ledger)
 
         for delta in self.delta_multipliers:
             deltatier = deepcopy(self.common_filter)
@@ -202,6 +215,8 @@ class DeltaTier:
                     deltatier.add_meas(meas, output=True)
                 deltatier.update(update_time, u, Q, nav_mean, nav_cov)
             buffer = deltatier.pull_buffer(last_shared_index)
+            # print("Delta Tier Ledger")
+            # self.debug_ledger(deltatier.ledger)
             print("Delta: {} size: {}".format(delta, self._get_buffer_size(buffer)))
             if self._get_buffer_size(buffer) < self.buffer_capacity:
                 print("@@@@@@@@@@@@@@@@@@@@@@@@@@@ SELECTINIG {} @@@@@@@@@@@@@@@@@@@@@@@".format(delta))
