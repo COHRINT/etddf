@@ -187,7 +187,7 @@ class MostRecent:
         P_prior = P_prior.reshape(self.num_ownship_states, self.num_ownship_states)
         
         c_bar, Pcc = MostRecent.run_covariance_intersection(x, P, x_prior, P_prior)
-
+        
         # Update main filter states
         if Pcc.shape != self.filter.P.shape:
             self.psci(x_prior, P_prior, c_bar, Pcc)
@@ -243,8 +243,9 @@ class MostRecent:
             new_meas = self.meas_ledger[ind]
             space = self.meas_space_table[new_meas.meas_type]
             if cost + space <= self.buffer_capacity:
-                buffer.append(new_meas)
-                cost += space
+                if "sonar_z" not in new_meas.meas_type and "modem" not in new_meas.meas_type:
+                    buffer.append(new_meas)
+                    cost += space
             else:
                 break
             ind -= 1
@@ -262,7 +263,7 @@ class MostRecent:
             nav filter covariance
         """
         if self.last_update_time is not None:
-            time_delta = (update_time - self.ledger[len(self.ledger) - 1]["time"]).to_sec()
+            time_delta = (update_time - self.last_update_time).to_sec()
             self.filter.predict(u, Q, time_delta, use_control_input=False)
 
         # Run correction step on filter
@@ -273,6 +274,8 @@ class MostRecent:
         if nav_mean is not None and nav_cov is not None:
             # print("***************************8 Intersecting **********************************")
             c_bar, Pcc = self.intersect(nav_mean, nav_cov)
+
+        self.last_update_time = update_time
 
         return c_bar, Pcc
 
