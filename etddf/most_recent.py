@@ -243,7 +243,7 @@ class MostRecent:
             new_meas = self.meas_ledger[ind]
             space = self.meas_space_table[new_meas.meas_type]
             if cost + space <= self.buffer_capacity:
-                if "sonar_z" not in new_meas.meas_type and "modem" not in new_meas.meas_type:
+                if "sonar_z" not in new_meas.meas_type and "modem" not in new_meas.meas_type and "gps" not in new_meas.meas_type:
                     buffer.append(new_meas)
                     cost += space
             else:
